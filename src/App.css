@@ -98,6 +98,47 @@
 
 .header-meta { gap: 22px; }
 
+.system-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.system-button {
+  min-width: 62px;
+  height: 46px;
+  display: grid;
+  grid-template-columns: auto auto;
+  place-items: center;
+  gap: 7px;
+  padding: 0 12px;
+  border: 1px solid #ffffff1f;
+  border-radius: 14px;
+  color: #a9b3c3;
+  background: #ffffff0a;
+  cursor: pointer;
+  transition: border-color 160ms ease, color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+.system-button span { font-size: 19px; }
+.system-button small { font-size: 11px; font-weight: 750; }
+
+.system-button:hover,
+.system-button:focus {
+  border-color: #ffffff66;
+  outline: none;
+  color: #fff;
+  background: #ffffff17;
+  transform: translateY(-2px);
+}
+
+.power-button:hover,
+.power-button:focus {
+  border-color: #ff5d6c99;
+  color: #ff7a86;
+  background: #e5091420;
+}
+
 .clock {
   display: grid;
   padding-right: 22px;

@@ -145,6 +145,26 @@ function App() {
             <span>{date}</span>
           </div>
           <div className="profile">R</div>
+          <div className="system-actions">
+            <button
+              className="system-button"
+              type="button"
+              title="Sair da Rany TV"
+              onClick={() => void window.ranyTV?.quitApp()}
+            >
+              <span aria-hidden="true">↪</span>
+              <small>Sair</small>
+            </button>
+            <button
+              className="system-button power-button"
+              type="button"
+              title="Desligar o computador"
+              onClick={() => void window.ranyTV?.powerOff()}
+            >
+              <span aria-hidden="true">⏻</span>
+              <small>Desligar</small>
+            </button>
+          </div>
         </div>
       </header>
 

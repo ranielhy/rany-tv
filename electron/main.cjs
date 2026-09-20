@@ -2,11 +2,12 @@ const {
   app,
   BrowserWindow,
   WebContentsView,
+  dialog,
   ipcMain,
   screen,
 } = require("electron");
 const path = require("path");
-const { spawn } = require("child_process");
+const { execFile, spawn } = require("child_process");
 
 const isDev = !app.isPackaged;
 
@@ -450,6 +451,49 @@ app.whenReady().then(() => {
     }
 
     return content;
+  });
+
+  ipcMain.handle("quit-app", async () => {
+    const { response } = await dialog.showMessageBox(mainWindow, {
+      type: "question",
+      title: "Sair da Rany TV",
+      message: "Deseja fechar a Rany TV?",
+      buttons: ["Cancelar", "Sair"],
+      defaultId: 0,
+      cancelId: 0,
+    });
+
+    if (response === 1) {
+      stopChrome();
+      app.quit();
+    }
+  });
+
+  ipcMain.handle("power-off", async () => {
+    const { response } = await dialog.showMessageBox(mainWindow, {
+      type: "warning",
+      title: "Desligar o computador",
+      message: "Deseja desligar o computador agora?",
+      detail: "Todos os aplicativos abertos serão encerrados.",
+      buttons: ["Cancelar", "Desligar"],
+      defaultId: 0,
+      cancelId: 0,
+    });
+
+    if (response !== 1) return;
+
+    stopChrome();
+    execFile("/usr/bin/systemctl", ["poweroff"], (error) => {
+      if (!error) return;
+
+      console.error("Erro ao desligar o computador:", error);
+      void dialog.showMessageBox(mainWindow, {
+        type: "error",
+        title: "Não foi possível desligar",
+        message: "O Linux não autorizou o desligamento.",
+        detail: "Verifique as permissões do usuário deste computador.",
+      });
+    });
   });
 
   app.on("activate", () => {

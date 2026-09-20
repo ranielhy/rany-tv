@@ -1,13 +1,23 @@
 {
   "name": "rany-tv",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.1",
+  "description": "Central de entretenimento para transformar um PC Linux em Smart TV",
+  "desktopName": "Rany TV",
+  "author": {
+    "name": "Rany",
+    "email": "rany@localhost"
+  },
+  "main": "electron/main.cjs",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "electron": "electron electron/main.cjs",
     "electron:dev": "concurrently -k \"npm run dev\" \"wait-on http://localhost:5173 && npm run electron\"",
+    "electron:prod": "npm run build && electron electron/main.cjs",
     "build": "tsc -b && vite build",
+    "dist:linux": "npm run build && electron-builder --linux AppImage deb",
+    "dist:portable": "npm run build && electron-builder --linux AppImage",
     "lint": "oxlint",
     "preview": "vite preview"
   },
@@ -23,9 +33,30 @@
     "@vitejs/plugin-react": "^6.1.1",
     "concurrently": "^10.0.5",
     "electron": "^44.4.3",
+    "electron-builder": "^26.15.3",
     "oxlint": "^1.81.0",
     "typescript": "~6.0.2",
     "vite": "^8.3.0",
     "wait-on": "^9.1.0"
+  },
+  "build": {
+    "appId": "com.rany.tv",
+    "productName": "Rany TV",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "category": "AudioVideo",
+      "syncDesktopName": true,
+      "executableName": "rany-tv",
+      "artifactName": "Rany-TV-${version}-${arch}.${ext}"
+    }
   }
 }

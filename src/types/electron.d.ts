@@ -5,6 +5,8 @@ declare global {
     ranyTV?: {
       openStreaming: (url: string) => void;
       loadPlaylist: (url: string) => Promise<string>;
+      quitApp: () => Promise<void>;
+      powerOff: () => Promise<void>;
     };
   }
 }

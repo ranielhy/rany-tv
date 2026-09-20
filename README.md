@@ -1,33 +1,47 @@
-# React + TypeScript + Vite
+# Rany TV
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Central de entretenimento em Electron para transformar um computador Linux em uma experiência de Smart TV.
 
-Currently, two official plugins are available:
+## Desenvolvimento
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm install
+npm run electron:dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
-# rany-tv
+## Gerar aplicativo para Linux
+
+Para criar o AppImage portátil e o instalador `.deb`:
+
+```bash
+npm run dist:linux
+```
+
+Os arquivos serão gerados na pasta `release/`.
+
+### Usar pelo pendrive
+
+Copie o arquivo `.AppImage` para o pendrive. No computador de destino, marque o arquivo como executável:
+
+```bash
+chmod +x Rany-TV-*.AppImage
+./Rany-TV-*.AppImage
+```
+
+O AppImage não precisa ser instalado.
+
+### Instalar no Ubuntu ou Debian
+
+```bash
+sudo apt install ./Rany-TV-*.deb
+```
+
+Depois, procure por **Rany TV** no menu de aplicativos.
+
+## Requisitos
+
+- Linux x64 compatível com Electron.
+- Google Chrome em `/usr/bin/google-chrome` para Netflix e outros serviços com DRM.
+- Internet para serviços de streaming e canais IPTV online.
+
+O AppImage inclui a Rany TV e o Electron, mas não inclui o Google Chrome nem credenciais dos serviços.
