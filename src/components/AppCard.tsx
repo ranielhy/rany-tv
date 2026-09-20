@@ -1,4 +1,4 @@
-import { forwardRef } from "react";
+import { forwardRef, type CSSProperties } from "react";
 import type { TvApp } from "../data/apps";
 
 interface AppCardProps {
@@ -31,13 +31,20 @@ export const AppCard = forwardRef<HTMLButtonElement, AppCardProps>(
         className={`app-card ${selected ? "selected" : ""}`}
         onClick={handleClick}
         onFocus={onSelect}
+        aria-label={`Abrir ${app.name}`}
+        aria-current={selected ? "true" : undefined}
+        style={{ "--app-accent": app.accent } as CSSProperties}
       >
-        <span className="app-icon">
-          {app.icon}
+        <span className="app-card-top">
+          <span className="app-icon">{app.icon}</span>
+          <span className="app-arrow">↗</span>
         </span>
 
-        <span className="app-name">
-          {app.name}
+        <span className="app-card-copy">
+          <span className="app-name">{app.name}</span>
+          <span className="app-status">
+            {app.url ? "Abrir aplicativo" : "Em breve"}
+          </span>
         </span>
       </button>
     );
