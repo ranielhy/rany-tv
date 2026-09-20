@@ -1,3 +1,12 @@
+.screen-loading {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  color: #aab3c2;
+  background: #080b12;
+  font-size: 18px;
+}
+
 .tv {
   --accent: #ff3b4f;
   position: relative;

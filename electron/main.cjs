@@ -428,6 +428,30 @@ app.whenReady().then(() => {
     closeStreaming();
   });
 
+  ipcMain.handle("load-playlist", async (_event, value) => {
+    const url = new URL(value);
+
+    if (!["http:", "https:"].includes(url.protocol)) {
+      throw new Error("Protocolo de playlist não permitido.");
+    }
+
+    const response = await fetch(url, {
+      signal: AbortSignal.timeout(15_000),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Falha ao carregar playlist: ${response.status}`);
+    }
+
+    const content = await response.text();
+
+    if (content.length > 5_000_000) {
+      throw new Error("A playlist excede o limite de 5 MB.");
+    }
+
+    return content;
+  });
+
   app.on("activate", () => {
     if (
       BrowserWindow.getAllWindows().length === 0

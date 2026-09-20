@@ -5,12 +5,18 @@ interface AppCardProps {
   app: TvApp;
   selected: boolean;
   onSelect: () => void;
+  onOpen?: () => void;
 }
 
 export const AppCard = forwardRef<HTMLButtonElement, AppCardProps>(
-  ({ app, selected, onSelect }, ref) => {
+  ({ app, selected, onSelect, onOpen }, ref) => {
     const handleClick = () => {
       onSelect();
+
+      if (onOpen) {
+        onOpen();
+        return;
+      }
 
       if (!app.url) {
         return;

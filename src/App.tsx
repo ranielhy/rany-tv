@@ -1,4 +1,6 @@
 import {
+  lazy,
+  Suspense,
   useEffect,
   useRef,
   useState,
@@ -9,8 +11,15 @@ import "./App.css";
 import { AppCard } from "./components/AppCard";
 import { apps } from "./data/apps";
 
+const LiveTv = lazy(() =>
+  import("./components/LiveTv").then((module) => ({
+    default: module.LiveTv,
+  }))
+);
+
 function App() {
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [screen, setScreen] = useState<"home" | "live-tv">("home");
   const [now, setNow] = useState(() => new Date());
   const [columns, setColumns] = useState(() =>
     window.innerWidth >= 1500 ? 7 : window.innerWidth >= 1050 ? 5 : 3
@@ -40,10 +49,14 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (screen !== "home") return;
+
     appRefs.current[selectedIndex]?.focus();
-  }, [selectedIndex]);
+  }, [screen, selectedIndex]);
 
   useEffect(() => {
+    if (screen !== "home") return;
+
     const handleKeyDown = (event: KeyboardEvent) => {
       switch (event.key) {
         case "ArrowRight":
@@ -85,7 +98,7 @@ function App() {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [columns]);
+  }, [columns, screen]);
 
   const time = new Intl.DateTimeFormat("pt-BR", {
     hour: "2-digit",
@@ -99,6 +112,14 @@ function App() {
   })
     .format(now)
     .replaceAll(".", "");
+
+  if (screen === "live-tv") {
+    return (
+      <Suspense fallback={<div className="screen-loading">Carregando TV…</div>}>
+        <LiveTv onHome={() => setScreen("home")} />
+      </Suspense>
+    );
+  }
 
   return (
     <main
@@ -168,6 +189,7 @@ function App() {
               app={app}
               selected={index === selectedIndex}
               onSelect={() => setSelectedIndex(index)}
+              onOpen={app.id === "live-tv" ? () => setScreen("live-tv") : undefined}
               ref={(element) => {
                 appRefs.current[index] = element;
               }}

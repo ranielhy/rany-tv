@@ -4,4 +4,5 @@ contextBridge.exposeInMainWorld("ranyTV", {
   openStreaming: (url) => {
     ipcRenderer.send("open-streaming", url);
   },
+  loadPlaylist: (url) => ipcRenderer.invoke("load-playlist", url),
 });
