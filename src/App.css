@@ -1,0 +1,134 @@
+.tv {
+  min-height: 100vh;
+  padding: 40px 64px 60px;
+
+  background:
+    radial-gradient(circle at 70% 0%, #202b46 0%, transparent 35%),
+    linear-gradient(180deg, #10141f 0%, #090b10 70%);
+}
+
+.tv-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.brand {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 4px;
+}
+
+.welcome {
+  margin: 6px 0 0;
+  color: #969daa;
+}
+
+.profile {
+  width: 48px;
+  height: 48px;
+
+  display: grid;
+  place-items: center;
+
+  border-radius: 50%;
+  background: white;
+  color: #111;
+
+  font-weight: 800;
+}
+
+.hero {
+  min-height: 270px;
+  display: flex;
+  align-items: center;
+}
+
+.hero-label {
+  color: #9da9bf;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  font-size: 13px;
+}
+
+.hero h1 {
+  max-width: 650px;
+  margin: 12px 0;
+
+  font-size: clamp(36px, 5vw, 64px);
+  line-height: 1.05;
+}
+
+.hero p {
+  color: #a8aeba;
+  font-size: 18px;
+}
+
+.apps-section h2 {
+  font-size: 20px;
+  margin-bottom: 18px;
+}
+
+.apps-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 18px;
+}
+
+.app-card {
+  min-height: 145px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+
+  padding: 22px;
+
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+
+  background: rgba(255, 255, 255, 0.07);
+  color: white;
+
+  cursor: pointer;
+
+  transition:
+    transform 150ms ease,
+    background 150ms ease,
+    border-color 150ms ease;
+}
+
+.app-card:hover,
+.app-card:focus {
+  transform: scale(1.05);
+
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.35);
+
+  outline: none;
+}
+
+.app-icon {
+  font-size: 36px;
+  font-weight: 800;
+}
+
+.app-name {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.app-card.selected {
+  transform: scale(1.06);
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.7);
+
+  box-shadow:
+    0 0 0 3px rgba(255, 255, 255, 0.12),
+    0 12px 35px rgba(0, 0, 0, 0.35);
+}
+
+.app-card.selected .app-name {
+  color: #ffffff;
+}

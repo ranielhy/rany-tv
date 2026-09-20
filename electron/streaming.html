@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0"
+    />
+    <title>Rany TV</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #090b10;
+        color: #fff;
+        font-family: Inter, system-ui, sans-serif;
+      }
+
+      .toolbar {
+        height: 72px;
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        padding: 0 24px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+        background: #10141f;
+      }
+
+      body.chrome-toolbar .toolbar {
+        border-bottom: 0;
+      }
+
+      button {
+        min-height: 44px;
+        padding: 0 20px;
+        border: 1px solid rgba(255, 255, 255, 0.35);
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.1);
+        color: #fff;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      button:hover,
+      button:focus {
+        outline: 3px solid rgba(255, 255, 255, 0.35);
+        background: rgba(255, 255, 255, 0.2);
+      }
+
+      .brand {
+        letter-spacing: 3px;
+        font-weight: 800;
+      }
+
+      .hint {
+        margin-left: auto;
+        color: #a8aeba;
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <nav class="toolbar" aria-label="Controles da Rany TV">
+      <button id="home" type="button">← Voltar para Home</button>
+      <span class="brand">RANY TV</span>
+      <span class="hint">ESC ou botão Voltar</span>
+    </nav>
+
+    <script>
+      document.getElementById("home").addEventListener("click", () => {
+        window.streamingControls.goHome();
+      });
+    </script>
+  </body>
+</html>
