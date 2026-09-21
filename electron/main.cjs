@@ -7,6 +7,7 @@ const {
   screen,
 } = require("electron");
 const path = require("path");
+const fs = require("fs/promises");
 const { execFile, spawn } = require("child_process");
 
 const isDev = !app.isPackaged;
@@ -16,6 +17,56 @@ let streamingWindow = null;
 let streamingView = null;
 let chromeWindow = null;
 let chromeProcess = null;
+let keyboardWindow = null;
+let keyboardTarget = "main";
+const chromeDebugPort = 9222;
+const autostartFile = path.join(
+  app.getPath("appData"),
+  "autostart",
+  "rany-tv.desktop"
+);
+
+function desktopEntryQuote(value) {
+  return `"${value.replaceAll("\\", "\\\\").replaceAll('"', '\\"').replaceAll("`", "\\`").replaceAll("$", "\\$")}"`;
+}
+
+async function isAutostartEnabled() {
+  try {
+    await fs.access(autostartFile);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function setAutostart(enabled) {
+  if (isDev || process.platform !== "linux") {
+    throw new Error("A inicialização automática só pode ser ativada após instalar a Rany TV.");
+  }
+
+  if (!enabled) {
+    await fs.rm(autostartFile, { force: true });
+    return false;
+  }
+
+  const executable = process.env.APPIMAGE || process.execPath;
+  const entry = [
+    "[Desktop Entry]",
+    "Type=Application",
+    "Name=Rany TV",
+    "Comment=Central de entretenimento Rany TV",
+    `Exec=${desktopEntryQuote(executable)}`,
+    `TryExec=${desktopEntryQuote(executable)}`,
+    "Terminal=false",
+    "X-GNOME-Autostart-enabled=true",
+    "StartupNotify=false",
+    "",
+  ].join("\n");
+
+  await fs.mkdir(path.dirname(autostartFile), { recursive: true });
+  await fs.writeFile(autostartFile, entry, { mode: 0o644 });
+  return true;
+}
 
 const allowedStreamingHosts = [
   "youtube.com",
@@ -58,10 +109,95 @@ function requiresChrome(value) {
 }
 
 function showHome() {
+  keyboardWindow?.hide();
+
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.show();
     mainWindow.setFullScreen(true);
     mainWindow.focus();
+  }
+}
+
+function createKeyboardWindow() {
+  if (keyboardWindow && !keyboardWindow.isDestroyed()) return keyboardWindow;
+
+  const display = screen.getPrimaryDisplay();
+  const { x, y, width, height } = display.bounds;
+  const keyboardHeight = Math.min(390, Math.round(height * 0.4));
+
+  keyboardWindow = new BrowserWindow({
+    x,
+    y: y + height - keyboardHeight,
+    width,
+    height: keyboardHeight,
+    frame: false,
+    resizable: false,
+    show: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    backgroundColor: "#10141f",
+    webPreferences: {
+      preload: path.join(__dirname, "keyboard-preload.cjs"),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+  keyboardWindow.setAlwaysOnTop(true, "screen-saver");
+  keyboardWindow.loadFile(path.join(__dirname, "keyboard.html"));
+  keyboardWindow.on("closed", () => { keyboardWindow = null; });
+  return keyboardWindow;
+}
+
+function showVirtualKeyboard(target) {
+  if (target) keyboardTarget = target;
+  const window = createKeyboardWindow();
+  window.show();
+  window.moveTop();
+}
+
+async function sendChromeKey(key) {
+  try {
+    const pages = await fetch(`http://127.0.0.1:${chromeDebugPort}/json`)
+      .then((response) => response.json());
+    const page = pages.find((item) => item.type === "page" && item.webSocketDebuggerUrl);
+    if (!page) return;
+
+    const socket = new WebSocket(page.webSocketDebuggerUrl);
+    await new Promise((resolve, reject) => {
+      socket.addEventListener("open", resolve, { once: true });
+      socket.addEventListener("error", reject, { once: true });
+    });
+    const method = key === "BACKSPACE" || key === "ENTER"
+      ? "Input.dispatchKeyEvent"
+      : "Input.insertText";
+    const params = method === "Input.insertText"
+      ? { text: key }
+      : { type: "keyDown", key: key === "BACKSPACE" ? "Backspace" : "Enter", code: key === "BACKSPACE" ? "Backspace" : "Enter" };
+    socket.send(JSON.stringify({ id: 1, method, params }));
+    setTimeout(() => socket.close(), 100);
+  } catch (error) {
+    console.error("Não foi possível enviar a tecla ao Chrome:", error.message);
+  }
+}
+
+function sendVirtualKey(key) {
+  if (keyboardTarget === "chrome") {
+    void sendChromeKey(key);
+    return;
+  }
+
+  const target = keyboardTarget === "streaming"
+    ? streamingView?.webContents
+    : mainWindow?.webContents;
+  if (!target || target.isDestroyed()) return;
+  target.focus();
+
+  if (key === "BACKSPACE" || key === "ENTER") {
+    const electronKey = key === "BACKSPACE" ? "Backspace" : "Enter";
+    target.sendInputEvent({ type: "keyDown", keyCode: electronKey });
+    target.sendInputEvent({ type: "keyUp", keyCode: electronKey });
+  } else {
+    target.insertText(key);
   }
 }
 
@@ -208,6 +344,9 @@ function openInChrome(url) {
       `--window-position=${x},${y}`,
       `--window-size=${width},${height}`,
       `--app=${url}`,
+      `--remote-debugging-port=${chromeDebugPort}`,
+      "--remote-debugging-address=127.0.0.1",
+      "--remote-allow-origins=*",
     ],
     {
       detached: true,
@@ -299,6 +438,7 @@ function openStreaming(url) {
 
   streamingView = new WebContentsView({
     webPreferences: {
+      preload: path.join(__dirname, "streaming-content-preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
     },
@@ -428,6 +568,29 @@ app.whenReady().then(() => {
   ipcMain.on("close-streaming", () => {
     closeStreaming();
   });
+
+  ipcMain.on("show-virtual-keyboard", (event) => {
+    const senderWindow = BrowserWindow.fromWebContents(event.sender);
+    const target = senderWindow === chromeWindow
+      ? "chrome"
+      : senderWindow === streamingWindow || event.sender === streamingView?.webContents
+        ? "streaming"
+        : "main";
+    showVirtualKeyboard(target);
+  });
+
+  ipcMain.on("virtual-key", (_event, key) => sendVirtualKey(key));
+  ipcMain.on("hide-virtual-keyboard", () => keyboardWindow?.hide());
+
+  ipcMain.handle("get-autostart", async () => ({
+    enabled: await isAutostartEnabled(),
+    available: !isDev && process.platform === "linux",
+  }));
+
+  ipcMain.handle("set-autostart", async (_event, enabled) => ({
+    enabled: await setAutostart(Boolean(enabled)),
+    available: true,
+  }));
 
   ipcMain.handle("load-playlist", async (_event, value) => {
     const url = new URL(value);

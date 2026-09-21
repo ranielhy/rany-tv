@@ -64,18 +64,25 @@
         color: #a8aeba;
         font-size: 14px;
       }
+
+      #keyboard { margin-left: auto; }
+      #keyboard + .hint { margin-left: 0; }
     </style>
   </head>
   <body>
     <nav class="toolbar" aria-label="Controles da Rany TV">
       <button id="home" type="button">← Voltar para Home</button>
       <span class="brand">RANY TV</span>
+      <button id="keyboard" type="button">⌨ Teclado</button>
       <span class="hint">ESC ou botão Voltar</span>
     </nav>
 
     <script>
       document.getElementById("home").addEventListener("click", () => {
         window.streamingControls.goHome();
+      });
+      document.getElementById("keyboard").addEventListener("click", () => {
+        window.streamingControls.showKeyboard();
       });
     </script>
   </body>

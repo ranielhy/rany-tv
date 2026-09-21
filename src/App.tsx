@@ -24,6 +24,10 @@ function App() {
   const [columns, setColumns] = useState(() =>
     window.innerWidth >= 1500 ? 7 : window.innerWidth >= 1050 ? 5 : 3
   );
+  const [showSettings, setShowSettings] = useState(false);
+  const [autostart, setAutostart] = useState(false);
+  const [autostartAvailable, setAutostartAvailable] = useState(true);
+  const [settingsMessage, setSettingsMessage] = useState("");
 
   const appRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
@@ -49,13 +53,20 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (screen !== "home") return;
-
-    appRefs.current[selectedIndex]?.focus();
-  }, [screen, selectedIndex]);
+    void window.ranyTV?.getAutostart().then((status) => {
+      setAutostart(status.enabled);
+      setAutostartAvailable(status.available);
+    });
+  }, []);
 
   useEffect(() => {
-    if (screen !== "home") return;
+    if (screen !== "home" || showSettings) return;
+
+    appRefs.current[selectedIndex]?.focus();
+  }, [screen, selectedIndex, showSettings]);
+
+  useEffect(() => {
+    if (screen !== "home" || showSettings) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
       switch (event.key) {
@@ -98,7 +109,21 @@ function App() {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [columns, screen]);
+  }, [columns, screen, showSettings]);
+
+  const updateAutostart = async () => {
+    try {
+      setSettingsMessage("Salvando…");
+      const status = await window.ranyTV?.setAutostart(!autostart);
+      if (!status) return;
+      setAutostart(status.enabled);
+      setSettingsMessage(status.enabled
+        ? "A Rany TV abrirá automaticamente ao iniciar o computador."
+        : "A inicialização automática foi desativada.");
+    } catch (error) {
+      setSettingsMessage(error instanceof Error ? error.message : "Não foi possível alterar esta configuração.");
+    }
+  };
 
   const time = new Intl.DateTimeFormat("pt-BR", {
     hour: "2-digit",
@@ -146,6 +171,15 @@ function App() {
           </div>
           <div className="profile">R</div>
           <div className="system-actions">
+            <button
+              className="system-button"
+              type="button"
+              title="Configurações"
+              onClick={() => setShowSettings(true)}
+            >
+              <span aria-hidden="true">⚙</span>
+              <small>Ajustes</small>
+            </button>
             <button
               className="system-button"
               type="button"
@@ -217,6 +251,29 @@ function App() {
           ))}
         </div>
       </section>
+
+      {showSettings && (
+        <div className="settings-overlay" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+          <section className="settings-modal">
+            <button className="settings-close" type="button" aria-label="Fechar configurações" onClick={() => setShowSettings(false)}>×</button>
+            <span className="eyebrow">Preferências</span>
+            <h2 id="settings-title">Configurações</h2>
+            <button
+              className={`setting-row ${autostart ? "enabled" : ""}`}
+              type="button"
+              role="switch"
+              aria-checked={autostart}
+              disabled={!autostartAvailable}
+              onClick={() => void updateAutostart()}
+            >
+              <span><strong>Iniciar com o sistema</strong><small>Abrir a Rany TV ao ligar o computador</small></span>
+              <i aria-hidden="true"><b /></i>
+            </button>
+            {!autostartAvailable && <p className="settings-note">Esta opção estará disponível após instalar a versão Linux da Rany TV.</p>}
+            {settingsMessage && <p className="settings-message" role="status">{settingsMessage}</p>}
+          </section>
+        </div>
+      )}
     </main>
   );
 }

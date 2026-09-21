@@ -7,6 +7,9 @@ declare global {
       loadPlaylist: (url: string) => Promise<string>;
       quitApp: () => Promise<void>;
       powerOff: () => Promise<void>;
+      showKeyboard: () => void;
+      getAutostart: () => Promise<{ enabled: boolean; available: boolean }>;
+      setAutostart: (enabled: boolean) => Promise<{ enabled: boolean; available: boolean }>;
     };
   }
 }

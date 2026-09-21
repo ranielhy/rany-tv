@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Teclado virtual</title>
+    <style>
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #10141f; color: #fff; font-family: Inter, system-ui, sans-serif; }
+      body { padding: 10px 18px 14px; border-top: 1px solid #ffffff2b; }
+      header { height: 32px; display: flex; align-items: center; justify-content: space-between; }
+      header strong { font-size: 14px; letter-spacing: 1px; }
+      #close { min-width: 90px; }
+      .keyboard { height: calc(100% - 38px); display: grid; grid-template-rows: repeat(5, 1fr); gap: 7px; }
+      .row { display: flex; justify-content: center; gap: 7px; }
+      button { min-width: 5.4vw; border: 1px solid #ffffff30; border-radius: 9px; color: #fff; background: #252b39; font: inherit; font-size: clamp(15px, 1.5vw, 23px); font-weight: 700; cursor: pointer; }
+      button:hover, button:focus { outline: 3px solid #4da3ff; background: #343d50; }
+      .wide { min-width: 11vw; }
+      .space { width: 38vw; }
+      .action { background: #23466f; }
+    </style>
+  </head>
+  <body>
+    <header><strong>⌨ TECLADO VIRTUAL</strong><button id="close" type="button">Fechar</button></header>
+    <main class="keyboard" aria-label="Teclado virtual"></main>
+    <script>
+      const rows = [
+        ["1","2","3","4","5","6","7","8","9","0","-","_","@"],
+        ["!","?","#","$","%","&","*","+","=",":",";",","] ,
+        ["q","w","e","r","t","y","u","i","o","p","á","é"],
+        ["a","s","d","f","g","h","j","k","l","ç",".","/"],
+        ["SHIFT","z","x","c","v","b","n","m","BACKSPACE","SPACE","ENTER"]
+      ];
+      const keyboard = document.querySelector(".keyboard");
+      let upper = false;
+
+      function render() {
+        keyboard.replaceChildren(...rows.map((keys) => {
+          const row = document.createElement("div");
+          row.className = "row";
+          keys.forEach((key) => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.dataset.key = key;
+            button.textContent = key === "BACKSPACE" ? "⌫ Apagar" : key === "SPACE" ? "Espaço" : key === "ENTER" ? "↵ Entrar" : key === "SHIFT" ? "⇧ Maiúsculas" : upper ? key.toUpperCase() : key;
+            if (["SHIFT", "BACKSPACE", "ENTER"].includes(key)) button.classList.add("wide", "action");
+            if (key === "SPACE") button.classList.add("space");
+            row.append(button);
+          });
+          return row;
+        }));
+      }
+
+      keyboard.addEventListener("click", (event) => {
+        const key = event.target.closest("button")?.dataset.key;
+        if (!key) return;
+        if (key === "SHIFT") { upper = !upper; render(); return; }
+        const value = key === "SPACE" ? " " : upper && key.length === 1 ? key.toUpperCase() : key;
+        window.virtualKeyboard.press(value);
+      });
+      document.getElementById("close").addEventListener("click", () => window.virtualKeyboard.close());
+      render();
+    </script>
+  </body>
+</html>

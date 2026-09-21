@@ -347,6 +347,58 @@
 .app-card:hover .app-arrow, .app-card:focus .app-arrow, .app-card.selected .app-arrow { opacity: 1; transform: translate(0); }
 .app-card.selected .app-status { color: #ffffffb8; }
 
+.settings-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: #03050ad9;
+  backdrop-filter: blur(12px);
+}
+
+.settings-modal {
+  position: relative;
+  width: min(600px, 92vw);
+  padding: 34px;
+  border: 1px solid #ffffff26;
+  border-radius: 24px;
+  background: #111722;
+  box-shadow: 0 30px 90px #000b;
+}
+
+.settings-modal h2 { margin: 7px 0 25px; font-size: 30px; }
+.settings-close { position: absolute; top: 18px; right: 18px; width: 44px; height: 44px; border: 0; border-radius: 50%; color: #fff; background: #ffffff12; font-size: 28px; cursor: pointer; }
+.settings-close:hover, .settings-close:focus { outline: 3px solid #ffffff55; background: #ffffff20; }
+
+.setting-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px;
+  border: 1px solid #ffffff1f;
+  border-radius: 16px;
+  color: #fff;
+  background: #ffffff0a;
+  text-align: left;
+  cursor: pointer;
+}
+
+.setting-row:hover, .setting-row:focus { outline: 3px solid #4da3ff55; border-color: #4da3ff; }
+.setting-row:disabled { cursor: not-allowed; opacity: .55; }
+.setting-row span { display: grid; gap: 5px; }
+.setting-row strong { font-size: 17px; }
+.setting-row small, .settings-note, .settings-message { color: #929daf; font-size: 13px; }
+.setting-row i { width: 56px; height: 30px; flex: 0 0 auto; padding: 3px; border-radius: 99px; background: #424b5a; transition: background 160ms ease; }
+.setting-row i b { display: block; width: 24px; height: 24px; border-radius: 50%; background: #fff; transition: transform 160ms ease; }
+.setting-row.enabled i { background: #2684ff; }
+.setting-row.enabled i b { transform: translateX(26px); }
+.settings-note, .settings-message { margin: 14px 4px 0; }
+.settings-message { color: #b8c9df; }
+
 @media (max-width: 1499px) {
   .hero { min-height: 310px; }
   .apps-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
