@@ -33,11 +33,6 @@
         background: #10141f;
       }
 
-      body.chrome-toolbar .toolbar {
-        height: 100vh;
-        border-bottom: 0;
-      }
-
       button {
         min-height: 44px;
         padding: 0 20px;
@@ -100,7 +95,6 @@
 
     <script>
       const query = new URLSearchParams(location.search);
-      if (query.get("mode") === "chrome") document.body.classList.add("chrome-toolbar");
       const toolbarHeight = Number(query.get("toolbarHeight"));
       if (toolbarHeight > 0) document.documentElement.style.setProperty("--toolbar-height", `${toolbarHeight}px`);
 

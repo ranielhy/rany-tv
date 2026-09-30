@@ -24,6 +24,7 @@ let keyboardTargetContents = null;
 let chromeKeyboardMonitor = null;
 let chromeEditableFocused = false;
 let chromeMonitorBusy = false;
+let chromeLaunching = false;
 const chromeDebugPort = 9222;
 const autostartFile = path.join(
   app.getPath("appData"),
@@ -192,18 +193,19 @@ async function getChromePage() {
   return pages.find((item) => item.type === "page" && item.webSocketDebuggerUrl);
 }
 
-async function chromeHasEditableFocus() {
+async function getChromePageState() {
   const page = await getChromePage();
-  if (!page) return false;
+  if (!page) return { editableFocused: false, controlsRequested: false };
 
   const socket = new WebSocket(page.webSocketDebuggerUrl);
   return new Promise((resolve) => {
+    const fallback = { editableFocused: false, controlsRequested: false };
     const finish = (value) => {
       clearTimeout(timeout);
       socket.close();
       resolve(value);
     };
-    const timeout = setTimeout(() => finish(false), 1_000);
+    const timeout = setTimeout(() => finish(fallback), 1_000);
 
     socket.addEventListener("open", () => {
       socket.send(JSON.stringify({
@@ -211,16 +213,32 @@ async function chromeHasEditableFocus() {
         method: "Runtime.evaluate",
         params: {
           expression: `(() => {
+            if (!window.__ranyControlsInstalled) {
+              window.__ranyControlsInstalled = true;
+              window.__ranyControlsRequested = false;
+              document.addEventListener("contextmenu", (event) => {
+                event.preventDefault();
+                window.__ranyControlsRequested = true;
+              }, true);
+              document.addEventListener("keydown", (event) => {
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  window.__ranyControlsRequested = true;
+                }
+              }, true);
+            }
+            const controlsRequested = window.__ranyControlsRequested === true;
+            window.__ranyControlsRequested = false;
             let element = document.activeElement;
             while (element?.tagName === "IFRAME") {
               try { element = element.contentDocument?.activeElement; }
-              catch { return false; }
+              catch { break; }
             }
-            if (!element) return false;
-            const tag = element.tagName;
-            const type = String(element.type || "text").toLowerCase();
+            const tag = element?.tagName;
+            const type = String(element?.type || "text").toLowerCase();
             const ignored = ["button", "checkbox", "color", "file", "hidden", "image", "radio", "range", "reset", "submit"];
-            return element.isContentEditable || tag === "TEXTAREA" || (tag === "INPUT" && !ignored.includes(type));
+            const editableFocused = Boolean(element && (element.isContentEditable || tag === "TEXTAREA" || (tag === "INPUT" && !ignored.includes(type))));
+            return { editableFocused, controlsRequested };
           })()`,
           returnByValue: true,
         },
@@ -228,10 +246,24 @@ async function chromeHasEditableFocus() {
     }, { once: true });
     socket.addEventListener("message", (event) => {
       const message = JSON.parse(event.data);
-      if (message.id === 1) finish(message.result?.result?.value === true);
+      if (message.id === 1) finish(message.result?.result?.value || fallback);
     });
-    socket.addEventListener("error", () => finish(false), { once: true });
+    socket.addEventListener("error", () => finish(fallback), { once: true });
   });
+}
+
+function showChromeControls() {
+  Menu.buildFromTemplate([
+    { label: "Voltar para a Home", click: closeStreaming },
+    { type: "separator" },
+    {
+      label: "Abrir teclado virtual",
+      click: () => {
+        keyboardTargetContents = null;
+        showVirtualKeyboard("chrome");
+      },
+    },
+  ]).popup();
 }
 
 function stopChromeKeyboardMonitor() {
@@ -247,7 +279,8 @@ function startChromeKeyboardMonitor() {
     if (chromeMonitorBusy || !chromeProcess) return;
     chromeMonitorBusy = true;
     try {
-      const editableFocused = await chromeHasEditableFocus();
+      const { editableFocused, controlsRequested } = await getChromePageState();
+      if (controlsRequested) showChromeControls();
       if (editableFocused && !chromeEditableFocused) showVirtualKeyboard("chrome");
       chromeEditableFocused = editableFocused;
     } catch {
@@ -290,6 +323,23 @@ function sendVirtualKey(key) {
   const target = keyboardTargetContents;
   if (!target || target.isDestroyed()) return;
   target.send("virtual-key-input", key);
+}
+
+async function navigateChromePage(url) {
+  try {
+    const page = await getChromePage();
+    if (!page) return false;
+    const socket = new WebSocket(page.webSocketDebuggerUrl);
+    await new Promise((resolve, reject) => {
+      socket.addEventListener("open", resolve, { once: true });
+      socket.addEventListener("error", reject, { once: true });
+    });
+    socket.send(JSON.stringify({ id: 1, method: "Page.navigate", params: { url } }));
+    setTimeout(() => socket.close(), 150);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function stopChrome() {
@@ -371,8 +421,19 @@ function createWindow() {
  * Abre serviços que precisam de DRM no Chrome,
  * mantendo os controles da Rany TV visíveis.
  */
-function openInChrome(url) {
-  stopChrome();
+async function openInChrome(url) {
+  if (chromeLaunching) return;
+  chromeLaunching = true;
+
+  if (await navigateChromePage(url)) {
+    chromeLaunching = false;
+    return;
+  }
+
+  const stoppedPreviousChrome = stopChrome();
+  if (stoppedPreviousChrome) {
+    await new Promise((resolve) => setTimeout(resolve, 700));
+  }
 
   if (chromeWindow && !chromeWindow.isDestroyed()) {
     chromeWindow.close();
@@ -384,46 +445,6 @@ function openInChrome(url) {
 
   const display = screen.getPrimaryDisplay();
   const { x, y, width, height } = display.bounds;
-  const toolbarHeight = getToolbarHeight();
-
-  chromeWindow = new BrowserWindow({
-    x,
-    y,
-    width,
-    height: toolbarHeight,
-    frame: false,
-    resizable: false,
-    show: false,
-    focusable: false,
-    alwaysOnTop: true,
-    autoHideMenuBar: true,
-    backgroundColor: "#10141f",
-    webPreferences: {
-      preload: path.join(
-        __dirname,
-        "streaming-preload.cjs"
-      ),
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
-  });
-
-  chromeWindow.setAlwaysOnTop(true, "screen-saver");
-  chromeWindow.once("ready-to-show", () => {
-    // Exibe os controles sem roubar o foco do Chrome. Isso evita o
-    // aviso do GNOME informando que a janela do streaming "está pronta".
-    chromeWindow?.showInactive();
-  });
-  chromeWindow.loadFile(path.join(__dirname, "streaming.html"), {
-    query: { mode: "chrome", toolbarHeight: String(toolbarHeight) },
-  });
-  attachContextMenu(chromeWindow.webContents, { goHome: closeStreaming, keyboardTarget: "chrome" });
-
-  chromeWindow.on("closed", () => {
-    chromeWindow = null;
-    stopChrome();
-  });
-
   const chromeProfile = path.join(
     app.getPath("userData"),
     "chrome-streaming-profile"
@@ -438,7 +459,6 @@ function openInChrome(url) {
       "--disable-session-crashed-bubble",
       "--disable-background-mode",
       "--disable-notifications",
-      "--kiosk",
       `--window-position=${x},${y}`,
       `--window-size=${width},${height}`,
       `--app=${url}`,
@@ -453,8 +473,10 @@ function openInChrome(url) {
   );
 
   startChromeKeyboardMonitor();
+  setTimeout(() => { chromeLaunching = false; }, 4_000);
 
   chromeProcess.on("error", (error) => {
+    chromeLaunching = false;
     console.error(
       "Erro ao abrir o Google Chrome:",
       error
@@ -467,6 +489,7 @@ function openInChrome(url) {
   });
 
   chromeProcess.on("exit", () => {
+    chromeLaunching = false;
     chromeProcess = null;
 
     if (chromeWindow && !chromeWindow.isDestroyed()) {
@@ -660,7 +683,7 @@ app.whenReady().then(() => {
       }
       // Serviços protegidos usam o Widevine do Chrome.
       if (requiresChrome(url)) {
-        openInChrome(url);
+        void openInChrome(url);
         return;
       }
 
