@@ -1,6 +1,4 @@
 import {
-  lazy,
-  Suspense,
   useEffect,
   useRef,
   useState,
@@ -11,18 +9,11 @@ import "./App.css";
 import { AppCard } from "./components/AppCard";
 import { apps } from "./data/apps";
 
-const LiveTv = lazy(() =>
-  import("./components/LiveTv").then((module) => ({
-    default: module.LiveTv,
-  }))
-);
-
 function App() {
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [screen, setScreen] = useState<"home" | "live-tv">("home");
   const [now, setNow] = useState(() => new Date());
   const [columns, setColumns] = useState(() =>
-    window.innerWidth >= 1500 ? 7 : window.innerWidth >= 1050 ? 5 : 3
+    window.innerWidth >= 1500 ? 7 : window.innerWidth >= 1050 ? 5 : window.innerWidth >= 700 ? 3 : window.innerWidth >= 440 ? 2 : 1
   );
   const [showSettings, setShowSettings] = useState(false);
   const [autostart, setAutostart] = useState(false);
@@ -41,7 +32,7 @@ function App() {
           ? 7
           : window.innerWidth >= 1050
             ? 5
-            : 3
+            : window.innerWidth >= 700 ? 3 : window.innerWidth >= 440 ? 2 : 1
       );
 
     window.addEventListener("resize", updateColumns);
@@ -52,6 +43,10 @@ function App() {
     };
   }, []);
 
+  useEffect(() => window.ranyTV?.onGoHome(() => {
+    setShowSettings(false);
+  }), []);
+
   useEffect(() => {
     void window.ranyTV?.getAutostart().then((status) => {
       setAutostart(status.enabled);
@@ -60,13 +55,13 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (screen !== "home" || showSettings) return;
+    if (showSettings) return;
 
     appRefs.current[selectedIndex]?.focus();
-  }, [screen, selectedIndex, showSettings]);
+  }, [selectedIndex, showSettings]);
 
   useEffect(() => {
-    if (screen !== "home" || showSettings) return;
+    if (showSettings) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
       switch (event.key) {
@@ -109,7 +104,7 @@ function App() {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [columns, screen, showSettings]);
+  }, [columns, showSettings]);
 
   const updateAutostart = async () => {
     try {
@@ -138,14 +133,6 @@ function App() {
     .format(now)
     .replaceAll(".", "");
 
-  if (screen === "live-tv") {
-    return (
-      <Suspense fallback={<div className="screen-loading">Carregando TV…</div>}>
-        <LiveTv onHome={() => setScreen("home")} />
-      </Suspense>
-    );
-  }
-
   return (
     <main
       className="tv"
@@ -171,6 +158,9 @@ function App() {
           </div>
           <div className="profile">R</div>
           <div className="system-actions">
+            <button className="system-button" type="button" title="Abrir teclado virtual" onClick={() => window.ranyTV?.showKeyboard()}>
+              <span aria-hidden="true">⌨</span><small>Teclado</small>
+            </button>
             <button
               className="system-button"
               type="button"
@@ -243,7 +233,7 @@ function App() {
               app={app}
               selected={index === selectedIndex}
               onSelect={() => setSelectedIndex(index)}
-              onOpen={app.id === "live-tv" ? () => setScreen("live-tv") : undefined}
+              onOpen={app.id === "settings" ? () => setShowSettings(true) : undefined}
               ref={(element) => {
                 appRefs.current[index] = element;
               }}

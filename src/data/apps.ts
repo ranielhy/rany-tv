@@ -65,13 +65,6 @@ export const apps: TvApp[] = [
     url: "https://globoplay.globo.com/",
   },
   {
-    id: "live-tv",
-    name: "TV ao vivo",
-    icon: "📺",
-    accent: "#22c55e",
-    description: "Acesse seus canais e conteúdos ao vivo.",
-  },
-  {
     id: "settings",
     name: "Configurações",
     icon: "⚙",

@@ -23,7 +23,8 @@
       }
 
       .toolbar {
-        height: 72px;
+        height: var(--toolbar-height, 72px);
+        width: 100%;
         display: flex;
         align-items: center;
         gap: 20px;
@@ -33,6 +34,7 @@
       }
 
       body.chrome-toolbar .toolbar {
+        height: 100vh;
         border-bottom: 0;
       }
 
@@ -67,17 +69,41 @@
 
       #keyboard { margin-left: auto; }
       #keyboard + .hint { margin-left: 0; }
+      .short-label { display: none; }
+
+      @media (max-width: 760px) {
+        .toolbar { gap: 12px; padding: 0 14px; }
+        .hint { display: none; }
+        button { min-height: 40px; padding: 0 14px; }
+      }
+
+      @media (max-width: 520px) {
+        .brand { display: none; }
+        #keyboard { margin-left: auto; }
+      }
+
+      @media (max-width: 380px) {
+        .toolbar { gap: 8px; padding: 0 8px; }
+        button { padding: 0 10px; font-size: 14px; }
+        .long-label { display: none; }
+        .short-label { display: inline; }
+      }
     </style>
   </head>
   <body>
     <nav class="toolbar" aria-label="Controles da Rany TV">
-      <button id="home" type="button">← Voltar para Home</button>
+      <button id="home" type="button">← <span class="long-label">Voltar para Home</span><span class="short-label">Voltar</span></button>
       <span class="brand">RANY TV</span>
       <button id="keyboard" type="button">⌨ Teclado</button>
       <span class="hint">ESC ou botão Voltar</span>
     </nav>
 
     <script>
+      const query = new URLSearchParams(location.search);
+      if (query.get("mode") === "chrome") document.body.classList.add("chrome-toolbar");
+      const toolbarHeight = Number(query.get("toolbarHeight"));
+      if (toolbarHeight > 0) document.documentElement.style.setProperty("--toolbar-height", `${toolbarHeight}px`);
+
       document.getElementById("home").addEventListener("click", () => {
         window.streamingControls.goHome();
       });

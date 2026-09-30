@@ -4,6 +4,7 @@ const {
   WebContentsView,
   dialog,
   ipcMain,
+  Menu,
   screen,
 } = require("electron");
 const path = require("path");
@@ -19,6 +20,10 @@ let chromeWindow = null;
 let chromeProcess = null;
 let keyboardWindow = null;
 let keyboardTarget = "main";
+let keyboardTargetContents = null;
+let chromeKeyboardMonitor = null;
+let chromeEditableFocused = false;
+let chromeMonitorBusy = false;
 const chromeDebugPort = 9222;
 const autostartFile = path.join(
   app.getPath("appData"),
@@ -118,6 +123,10 @@ function showHome() {
   }
 }
 
+function getToolbarHeight() {
+  return screen.getPrimaryDisplay().bounds.height <= 720 ? 56 : 72;
+}
+
 function createKeyboardWindow() {
   if (keyboardWindow && !keyboardWindow.isDestroyed()) return keyboardWindow;
 
@@ -134,6 +143,7 @@ function createKeyboardWindow() {
     resizable: false,
     show: false,
     alwaysOnTop: true,
+    focusable: false,
     skipTaskbar: true,
     backgroundColor: "#10141f",
     webPreferences: {
@@ -151,15 +161,106 @@ function createKeyboardWindow() {
 function showVirtualKeyboard(target) {
   if (target) keyboardTarget = target;
   const window = createKeyboardWindow();
-  window.show();
+  window.showInactive();
   window.moveTop();
+}
+
+function attachContextMenu(contents, options = {}) {
+  contents.on("context-menu", (_event, params) => {
+    const template = [
+      { label: "Voltar para a Home", accelerator: "Esc", click: () => options.goHome?.() },
+      { type: "separator" },
+    ];
+    if (options.canGoBack?.()) template.push({ label: "Voltar à página anterior", click: () => contents.goBack() });
+    if (params.isEditable) template.push(
+      { label: "Recortar", role: "cut", enabled: params.editFlags.canCut },
+      { label: "Copiar", role: "copy", enabled: params.editFlags.canCopy },
+      { label: "Colar", role: "paste", enabled: params.editFlags.canPaste },
+      { type: "separator" }
+    );
+    template.push({ label: "Abrir teclado virtual", click: () => {
+      keyboardTargetContents = contents;
+      showVirtualKeyboard(options.keyboardTarget || "main");
+    } });
+    Menu.buildFromTemplate(template).popup({ window: BrowserWindow.fromWebContents(contents) || undefined });
+  });
+}
+
+async function getChromePage() {
+  const pages = await fetch(`http://127.0.0.1:${chromeDebugPort}/json`)
+    .then((response) => response.json());
+  return pages.find((item) => item.type === "page" && item.webSocketDebuggerUrl);
+}
+
+async function chromeHasEditableFocus() {
+  const page = await getChromePage();
+  if (!page) return false;
+
+  const socket = new WebSocket(page.webSocketDebuggerUrl);
+  return new Promise((resolve) => {
+    const finish = (value) => {
+      clearTimeout(timeout);
+      socket.close();
+      resolve(value);
+    };
+    const timeout = setTimeout(() => finish(false), 1_000);
+
+    socket.addEventListener("open", () => {
+      socket.send(JSON.stringify({
+        id: 1,
+        method: "Runtime.evaluate",
+        params: {
+          expression: `(() => {
+            let element = document.activeElement;
+            while (element?.tagName === "IFRAME") {
+              try { element = element.contentDocument?.activeElement; }
+              catch { return false; }
+            }
+            if (!element) return false;
+            const tag = element.tagName;
+            const type = String(element.type || "text").toLowerCase();
+            const ignored = ["button", "checkbox", "color", "file", "hidden", "image", "radio", "range", "reset", "submit"];
+            return element.isContentEditable || tag === "TEXTAREA" || (tag === "INPUT" && !ignored.includes(type));
+          })()`,
+          returnByValue: true,
+        },
+      }));
+    }, { once: true });
+    socket.addEventListener("message", (event) => {
+      const message = JSON.parse(event.data);
+      if (message.id === 1) finish(message.result?.result?.value === true);
+    });
+    socket.addEventListener("error", () => finish(false), { once: true });
+  });
+}
+
+function stopChromeKeyboardMonitor() {
+  if (chromeKeyboardMonitor) clearInterval(chromeKeyboardMonitor);
+  chromeKeyboardMonitor = null;
+  chromeEditableFocused = false;
+  chromeMonitorBusy = false;
+}
+
+function startChromeKeyboardMonitor() {
+  stopChromeKeyboardMonitor();
+  chromeKeyboardMonitor = setInterval(async () => {
+    if (chromeMonitorBusy || !chromeProcess) return;
+    chromeMonitorBusy = true;
+    try {
+      const editableFocused = await chromeHasEditableFocus();
+      if (editableFocused && !chromeEditableFocused) showVirtualKeyboard("chrome");
+      chromeEditableFocused = editableFocused;
+    } catch {
+      chromeEditableFocused = false;
+    } finally {
+      chromeMonitorBusy = false;
+    }
+  }, 700);
 }
 
 async function sendChromeKey(key) {
   try {
-    const pages = await fetch(`http://127.0.0.1:${chromeDebugPort}/json`)
-      .then((response) => response.json());
-    const page = pages.find((item) => item.type === "page" && item.webSocketDebuggerUrl);
+    const page = await getChromePage();
     if (!page) return;
 
     const socket = new WebSocket(page.webSocketDebuggerUrl);
@@ -186,22 +287,13 @@ function sendVirtualKey(key) {
     return;
   }
 
-  const target = keyboardTarget === "streaming"
-    ? streamingView?.webContents
-    : mainWindow?.webContents;
+  const target = keyboardTargetContents;
   if (!target || target.isDestroyed()) return;
-  target.focus();
-
-  if (key === "BACKSPACE" || key === "ENTER") {
-    const electronKey = key === "BACKSPACE" ? "Backspace" : "Enter";
-    target.sendInputEvent({ type: "keyDown", keyCode: electronKey });
-    target.sendInputEvent({ type: "keyUp", keyCode: electronKey });
-  } else {
-    target.insertText(key);
-  }
+  target.send("virtual-key-input", key);
 }
 
 function stopChrome() {
+  stopChromeKeyboardMonitor();
   if (
     !chromeProcess ||
     chromeProcess.exitCode !== null ||
@@ -248,6 +340,11 @@ function createWindow() {
     );
   }
 
+  attachContextMenu(mainWindow.webContents, {
+    goHome: () => mainWindow?.webContents.send("navigate-home"),
+    keyboardTarget: "main",
+  });
+
   /**
    * F11 alterna o fullscreen da Home.
    * Útil enquanto estamos desenvolvendo.
@@ -287,7 +384,7 @@ function openInChrome(url) {
 
   const display = screen.getPrimaryDisplay();
   const { x, y, width, height } = display.bounds;
-  const toolbarHeight = 72;
+  const toolbarHeight = getToolbarHeight();
 
   chromeWindow = new BrowserWindow({
     x,
@@ -317,9 +414,10 @@ function openInChrome(url) {
     // aviso do GNOME informando que a janela do streaming "está pronta".
     chromeWindow?.showInactive();
   });
-  chromeWindow.loadFile(
-    path.join(__dirname, "streaming.html")
-  );
+  chromeWindow.loadFile(path.join(__dirname, "streaming.html"), {
+    query: { mode: "chrome", toolbarHeight: String(toolbarHeight) },
+  });
+  attachContextMenu(chromeWindow.webContents, { goHome: closeStreaming, keyboardTarget: "chrome" });
 
   chromeWindow.on("closed", () => {
     chromeWindow = null;
@@ -353,6 +451,8 @@ function openInChrome(url) {
       stdio: "ignore",
     }
   );
+
+  startChromeKeyboardMonitor();
 
   chromeProcess.on("error", (error) => {
     console.error(
@@ -432,9 +532,10 @@ function openStreaming(url) {
     },
   });
 
-  streamingWindow.loadFile(
-    path.join(__dirname, "streaming.html")
-  );
+  const toolbarHeight = getToolbarHeight();
+  streamingWindow.loadFile(path.join(__dirname, "streaming.html"), {
+    query: { toolbarHeight: String(toolbarHeight) },
+  });
 
   streamingView = new WebContentsView({
     webPreferences: {
@@ -462,9 +563,9 @@ function openStreaming(url) {
 
     streamingView.setBounds({
       x: 0,
-      y: 72,
+      y: toolbarHeight,
       width,
-      height: Math.max(0, height - 72),
+      height: Math.max(0, height - toolbarHeight),
     });
   };
 
@@ -482,6 +583,12 @@ function openStreaming(url) {
   );
 
   streamingView.webContents.loadURL(url);
+  attachContextMenu(streamingWindow.webContents, { goHome: closeStreaming, keyboardTarget: "streaming" });
+  attachContextMenu(streamingView.webContents, {
+    goHome: closeStreaming,
+    canGoBack: () => streamingView?.webContents.canGoBack() === true,
+    keyboardTarget: "streaming",
+  });
 
   /**
    * ESC -> fecha streaming e volta para Home
@@ -576,6 +683,7 @@ app.whenReady().then(() => {
       : senderWindow === streamingWindow || event.sender === streamingView?.webContents
         ? "streaming"
         : "main";
+    keyboardTargetContents = target === "chrome" ? null : event.sender;
     showVirtualKeyboard(target);
   });
 
@@ -591,30 +699,6 @@ app.whenReady().then(() => {
     enabled: await setAutostart(Boolean(enabled)),
     available: true,
   }));
-
-  ipcMain.handle("load-playlist", async (_event, value) => {
-    const url = new URL(value);
-
-    if (!["http:", "https:"].includes(url.protocol)) {
-      throw new Error("Protocolo de playlist não permitido.");
-    }
-
-    const response = await fetch(url, {
-      signal: AbortSignal.timeout(15_000),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Falha ao carregar playlist: ${response.status}`);
-    }
-
-    const content = await response.text();
-
-    if (content.length > 5_000_000) {
-      throw new Error("A playlist excede o limite de 5 MB.");
-    }
-
-    return content;
-  });
 
   ipcMain.handle("quit-app", async () => {
     const { response } = await dialog.showMessageBox(mainWindow, {

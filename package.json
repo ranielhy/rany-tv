@@ -1,7 +1,7 @@
 {
   "name": "rany-tv",
   "private": true,
-  "version": "1.0.1",
+  "version": "1.0.5",
   "description": "Central de entretenimento para transformar um PC Linux em Smart TV",
   "desktopName": "Rany TV",
   "author": {
@@ -22,7 +22,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "hls.js": "^1.7.3",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },
@@ -52,7 +51,10 @@
     ],
     "asar": true,
     "linux": {
-      "target": ["AppImage", "deb"],
+      "target": [
+        "AppImage",
+        "deb"
+      ],
       "category": "AudioVideo",
       "syncDesktopName": true,
       "executableName": "rany-tv",
